@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF">
+  <title>Pixi 无限网格视图</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    #info {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      color: white;
+      font-family: sans-serif;
+      background: rgba(0,0,0,0.5);
+      padding: 4px 8px;
+      border-radius: 4px;
+      z-index: 10;
+    }
+  </style>
+</head>
+<body>
+<div id="info">World: (0, 0)</div>
+<script src="https://pixijs.download/release/pixi.min.js"></script>
+<script>
+  async function main() {
+    const app = new PIXI.Application();
+  await app.init({
+    width: 1920,
+    height: 1080,
+    antialias: true,
+    transparent: false,
+    resolution: 1,
+  })
+  document.body.appendChild(app.view);
+
+  const world = new PIXI.Container();
+  app.stage.addChild(world);
+
+  const grid = new PIXI.Graphics();
+  world.addChild(grid);
+
+  const info = document.getElementById("info");
+
+  // 拖动逻辑
+  let dragging = false;
+  let lastPos = { x: 0, y: 0 };
+  app.view.addEventListener("mousedown", e => {
+    dragging = true;
+    lastPos = { x: e.clientX, y: e.clientY };
+  });
+  window.addEventListener("mouseup", () => dragging = false);
+  window.addEventListener("mousemove", e => {
+    if (dragging) {
+      const dx = e.clientX - lastPos.x;
+      const dy = e.clientY - lastPos.y;
+      world.x += dx;
+      world.y += dy;
+      lastPos = { x: e.clientX, y: e.clientY };
+    }
+
+    // 显示鼠标世界坐标
+    const screen = new PIXI.Point(e.clientX, e.clientY);
+    const worldPos = world.toLocal(screen, app.stage);
+    info.textContent = `World: (${worldPos.x.toFixed(1)}, ${worldPos.y.toFixed(1)})`;
+  });
+
+  // 缩放逻辑
+  app.view.addEventListener("wheel", e => {
+    const scaleFactor = e.deltaY < 0 ? 1.1 : 0.9;
+    const mouse = new PIXI.Point(e.clientX, e.clientY);
+    const worldBefore = world.toLocal(mouse, app.stage);
+
+    world.scale.x *= scaleFactor;
+    world.scale.y *= scaleFactor;
+
+    const worldAfter = world.toLocal(mouse, app.stage);
+    world.x += (worldAfter.x - worldBefore.x) * world.scale.x;
+    world.y += (worldAfter.y - worldBefore.y) * world.scale.y;
+  });
+
+  // 动态绘制当前视图可见网格
+  function drawGrid() {
+    grid.clear();
+    const gridSize = 100;
+
+    // 当前视图在世界坐标中的范围
+    const left = -world.x / world.scale.x;
+    const top = -world.y / world.scale.y;
+    const right = (app.screen.width - world.x) / world.scale.x;
+    const bottom = (app.screen.height - world.y) / world.scale.y;
+
+    const startX = Math.floor(left / gridSize) * gridSize;
+    const endX = Math.ceil(right / gridSize) * gridSize;
+    const startY = Math.floor(top / gridSize) * gridSize;
+    const endY = Math.ceil(bottom / gridSize) * gridSize;
+
+    // grid.lineStyle(1 / world.scale.x, 0x444444, 1);
+    for (let x = startX; x <= endX; x += gridSize) {
+      grid.moveTo(x, startY);
+      grid.lineTo(x, endY);
+    }
+    for (let y = startY; y <= endY; y += gridSize) {
+      grid.moveTo(startX, y);
+      grid.lineTo(endX, y);
+    }
+    grid.stroke({ color: 0xffffff, width: 1 });
+    // 画中心十字
+    // grid.lineStyle(2 / world.scale.x, 0xff4444, 1);
+    grid.moveTo(-10, 0);
+    grid.lineTo(10, 0);
+    grid.moveTo(0, -10);
+    grid.lineTo(0, 10);
+    grid.stroke({ color: 0xffffff, width: 1 });
+  }
+
+  // 每帧重绘
+  app.ticker.add(() => {
+    drawGrid();
+  });
+
+  window.addEventListener("resize", () => {
+    app.renderer.resize(window.innerWidth, window.innerHeight);
+  });
+  }
+  main();
+</script>
+</body>
+</html>

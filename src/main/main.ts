@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, screen, session } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { setSkelPath } from './module/Store';
@@ -13,6 +13,8 @@ process.stdout.write = ((write) => {
   };
 })(process.stdout.write);
 
+// proxy
+app.commandLine.appendSwitch('proxy-server', '127.0.0.1:10809');
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (started) {
   app.quit();
@@ -50,7 +52,7 @@ ipcMain.handle('dialog:openFile', async () => {
   // 尝试找到对应的 atlas 文件
   const atlasPath = path.join(basePath, baseName + '.atlas');
   if (fs.existsSync(atlasPath)) {
-    
+
     const atlasBuffer = fs.readFileSync(atlasPath);
     result.atlasFile = {
       name: baseName + '.atlas',
@@ -59,7 +61,7 @@ ipcMain.handle('dialog:openFile', async () => {
     };
 
     // find png file
-    const pngString  = atlasBuffer.toString('utf8');
+    const pngString = atlasBuffer.toString('utf8');
     let atlas = new TextureAtlas(pngString);
 
     const textureFiles: SpineRawData[] = []
@@ -82,8 +84,8 @@ ipcMain.handle('dialog:openFile', async () => {
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 800,
-    height: 600,
+    width: 1024,
+    height: 768,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
     },
@@ -134,7 +136,10 @@ const createWindow = () => {
 app.on('ready', () => {
   createWindow();
   httpServer.start();
+
+  loadExtension();
 });
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -142,6 +147,7 @@ app.on('window-all-closed', async () => {
   if (process.platform !== 'darwin') {
     await httpServer.stop();
     app.quit();
+
   }
 });
 
@@ -155,3 +161,16 @@ app.on('activate', () => {
 
 // In this file you can include the rest of your app's specific main process
 // code. You can also put them in separate files and import them here.
+
+
+// extension
+async function loadExtension() {
+  try {
+    const extensionPath = path.resolve(__dirname, '../../assets/aamddddknhcagpehecnhphigffljadon');
+    const { id, name } = await session.defaultSession.extensions.loadExtension(extensionPath);
+    console.log(`Loaded extension ${name} (${id})`)
+  } catch (error) {
+    console.error(error)
+  }
+};
+

@@ -14,7 +14,7 @@ import {
 import { setSpineAssets } from '../store/globalSlice';
 import { setCurrentFilePath } from '../store/globalSlice';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
-
+import { SkeletonBinary } from '@esotericsoftware/spine-canvas';
 const Menu: React.FC = () => {
     const dispatch = useAppDispatch();
     const { currentSpineAssets } = useAppSelector(state => state.global);

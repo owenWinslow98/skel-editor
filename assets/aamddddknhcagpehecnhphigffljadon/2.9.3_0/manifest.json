@@ -1,0 +1,16 @@
+{
+   "action": {
+      "default_popup": "pixi-popup.html"
+   },
+   "description": "Debug games and apps written with PixiJS",
+   "devtools_page": "pixi-devtools.html",
+   "icons": {
+      "16": "icon.png",
+      "48": "icon.png"
+   },
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAijHg13T/LuVFeaau+bEFhb+LNdZJyHeBsgOBkgzBPIz1mwWjbj8kk5ILmQfl6BvevTNN2zT4tkQznYW41pIV3rsFCGPeOhCRNBHEJqJkRSHY8Ewg8AUg2P03pdE7ndbF6Pe2bOMYy8lk6kxEMUfNK/s08D7/VbTNWD9Oq5IxeEkZRzLlKy89m4itIerzYlSQHh1v9mQ8/qXXCNy5F6+qC9PaCC4xT7LTBLtyOktghtWZUvcSf0i+ffqVNIf4BMTXsuhZZw2k9n7EbjGfPNMdJMEJIA+WTi+X8rgtS+8qUR9aqwEL5jClMPdwPQ390VLPInqX2DCxWyOXZwxPGvsonwIDAQAB",
+   "manifest_version": 3,
+   "name": "PixiJS Devtools",
+   "update_url": "https://clients2.google.com/service/update2/crx",
+   "version": "2.9.3"
+}

@@ -1,10 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import globalReducer from './globalSlice';
-
+import canvasReducer from './CanvasSlice';
 // 配置 store
 export const store = configureStore({
   reducer: {
     global: globalReducer,
+    canvas: canvasReducer,
   },
   // 开发环境下启用 Redux DevTools
   devTools: process.env.NODE_ENV !== 'production',
