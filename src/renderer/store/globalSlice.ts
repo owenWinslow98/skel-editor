@@ -1,10 +1,10 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
 
 // 定义 Spine 文件数据的类型
-interface SpineFileData {
-  name: string;
-  data: string; // blob URL 字符串
-  path: string;
+interface SpineFile {
+  file: string | null,
+  path: string | null,
+  name: string,
 }
 
 interface SpineRawData {
@@ -14,9 +14,10 @@ interface SpineRawData {
 }
 
 interface SpineAssets {
-  skelFile: SpineFileData | null;
-  atlasFile: SpineFileData | null;
-  textureFiles: SpineFileData[] | null;
+  skel: SpineFile | null;
+  atlas: SpineFile | null;
+  json: SpineFile | null;
+  skins: SpineFile[] | null;
   fileVersion: string;
 }
 
@@ -30,39 +31,32 @@ interface GlobalState {
   isSpineLoaded: boolean;
   spineLoadError: string | null;
 
-  // 动画状态
-  currentAnimation: string | null;
-  isPlaying: boolean;
-  animationSpeed: number;
-
   // UI 状态
   showGrid: boolean;
   showBounds: boolean;
-  backgroundColor: string;
 
   // 文件状态
   currentFilePath: string | null;
   hasUnsavedChanges: boolean;
+  isBlackUISkin: boolean;
+  isAssetsReady: boolean;
 }
 
 // 初始状态
 const initialState: GlobalState = {
   isMaximized: false,
 
-  currentSpineAssets: null,
-  isSpineLoaded: false,
-  spineLoadError: null,
-
-  currentAnimation: null,
-  isPlaying: false,
-  animationSpeed: 1.0,
+  currentSpineAssets: null, // 当前 Spine 资源
+  isSpineLoaded: false, // Spine 资源是否加载完成
+  spineLoadError: null, // Spine 资源加载错误
 
   showGrid: false,
   showBounds: false,
-  backgroundColor: '#333333',
 
   currentFilePath: null,
   hasUnsavedChanges: false,
+  isBlackUISkin: false, // 黑夜模式
+  isAssetsReady: false, // 资源是否加载完成
 };
 
 // 创建 slice
@@ -80,6 +74,7 @@ const globalSlice = createSlice({
       state.currentSpineAssets = action.payload;
       state.isSpineLoaded = false;
       state.spineLoadError = null;
+      state.isAssetsReady = true;
     },
 
     setSpineLoaded: (state, action: PayloadAction<boolean>) => {
@@ -92,27 +87,6 @@ const globalSlice = createSlice({
     setSpineLoadError: (state, action: PayloadAction<string>) => {
       state.spineLoadError = action.payload;
       state.isSpineLoaded = false;
-    },
-
-    clearSpineAssets: (state) => {
-      state.currentSpineAssets = null;
-      state.isSpineLoaded = false;
-      state.spineLoadError = null;
-      state.currentAnimation = null;
-      state.isPlaying = false;
-    },
-
-    // 动画控制
-    setCurrentAnimation: (state, action: PayloadAction<string>) => {
-      state.currentAnimation = action.payload;
-    },
-
-    setPlaying: (state, action: PayloadAction<boolean>) => {
-      state.isPlaying = action.payload;
-    },
-
-    setAnimationSpeed: (state, action: PayloadAction<number>) => {
-      state.animationSpeed = Math.max(0.1, Math.min(5.0, action.payload));
     },
 
     // UI 控制
@@ -132,10 +106,6 @@ const globalSlice = createSlice({
       state.showBounds = action.payload;
     },
 
-    setBackgroundColor: (state, action: PayloadAction<string>) => {
-      state.backgroundColor = action.payload;
-    },
-
     // 文件状态管理
     setCurrentFilePath: (state, action: PayloadAction<string | null>) => {
       state.currentFilePath = action.payload;
@@ -145,6 +115,13 @@ const globalSlice = createSlice({
       state.hasUnsavedChanges = action.payload;
     },
 
+    toggleBlackUISkin: (state) => {
+      state.isBlackUISkin = !state.isBlackUISkin;
+    },
+
+    setAssetsReady: (state, action: PayloadAction<boolean>) => {
+      state.isAssetsReady = action.payload;
+    },
     // 重置所有状态
     resetGlobalState: () => initialState,
   },
@@ -156,22 +133,18 @@ export const {
   setSpineAssets,
   setSpineLoaded,
   setSpineLoadError,
-  clearSpineAssets,
-  setCurrentAnimation,
-  setPlaying,
-  setAnimationSpeed,
   toggleGrid,
   setShowGrid,
   toggleBounds,
   setShowBounds,
-  setBackgroundColor,
   setCurrentFilePath,
   setUnsavedChanges,
   resetGlobalState,
+  toggleBlackUISkin,
 } = globalSlice.actions;
 
 // 导出 reducer
 export default globalSlice.reducer;
 
 // 导出类型
-export type { GlobalState, SpineAssets, SpineFileData, SpineRawData };
+export type { GlobalState, SpineAssets, SpineFile, SpineRawData };

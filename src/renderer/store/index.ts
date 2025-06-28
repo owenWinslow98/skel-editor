@@ -1,6 +1,6 @@
 import { configureStore } from '@reduxjs/toolkit';
 import globalReducer from './globalSlice';
-import canvasReducer from './CanvasSlice';
+import canvasReducer from './canvasSlice';
 // 配置 store
 export const store = configureStore({
   reducer: {

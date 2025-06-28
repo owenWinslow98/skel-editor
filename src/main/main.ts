@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, screen, session } from 'electron';
+import { app, BrowserWindow, dialog, screen, session } from 'electron';
 import path from 'node:path';
 import started from 'electron-squirrel-startup';
 import { setSkelPath } from './module/Store';
@@ -6,12 +6,33 @@ import fs from 'node:fs';
 import httpServer from './module/HttpHelper';
 import { TextureAtlas } from '@esotericsoftware/spine-core';
 import { SpineRawData } from '../renderer/store/globalSlice';
-import { readVersionFromSkel } from './module/Utils';
+import { getResources } from './module/Utils';
+import { ipcMain } from 'electron-better-ipc'
+// import { getResources } from './module/getResource';
+
 process.stdout.write = ((write) => {
   return function (chunk: any, encoding?: any, callback?: any) {
     return write.call(process.stdout, '[main] ' + chunk, encoding, callback);
   };
 })(process.stdout.write);
+
+
+const validFileList = (fileList: string[]): boolean => {
+  const mainWindow = BrowserWindow.getAllWindows()[0]
+  if (fileList.length < 2) {
+    ipcMain.callRenderer(mainWindow, 'toast-message', 'at least two files are required.')
+    return false;
+  }
+  if (!fileList.some(file => file.endsWith('.skel') || file.endsWith('.json'))) {
+    ipcMain.callRenderer(mainWindow, 'toast-message', 'please select one skel(.skel) or json(.json) file.')
+    return false;
+  }
+  if (!fileList.some(file => file.endsWith('.atlas'))) {
+    ipcMain.callRenderer(mainWindow, 'toast-message', 'please select one atlas(.atlas) file.')
+    return false;
+  }
+  return true;
+}
 
 // proxy
 app.commandLine.appendSwitch('proxy-server', '127.0.0.1:10809');
@@ -19,68 +40,26 @@ app.commandLine.appendSwitch('proxy-server', '127.0.0.1:10809');
 if (started) {
   app.quit();
 }
-ipcMain.handle('dialog:openFile', async () => {
-  const { canceled, filePaths } = await dialog.showOpenDialog({
-    properties: ['openFile'],
-    filters: [
-      { name: '*.skel,*.json', extensions: ['skel', 'json'] },
-    ]
-  });
-  if (canceled) return null;
-
-  setSkelPath(filePaths[0]);
-  // 读取文件为 Buffer，然后转换为可传输的格式
-  const fileBuffer = fs.readFileSync(filePaths[0]);
-  const version = readVersionFromSkel(fileBuffer)
-
-  const fileExtension = path.extname(filePaths[0]);
-
-  // 同时读取相关的 atlas 和 png 文件（如果存在）
-  const basePath = path.dirname(filePaths[0]);
-  const baseName = path.basename(filePaths[0], fileExtension);
-  const result = {
-    skelFile: {
-      name: path.basename(filePaths[0]),
-      data: fileBuffer, // 转换为数组以便传输
-      path: filePaths[0]
-    },
-    atlasFile: null as any,
-    textureFiles: null as any,
-    fileVersion: version
-  };
-
-  // 尝试找到对应的 atlas 文件
-  const atlasPath = path.join(basePath, baseName + '.atlas');
-  if (fs.existsSync(atlasPath)) {
-
-    const atlasBuffer = fs.readFileSync(atlasPath);
-    result.atlasFile = {
-      name: baseName + '.atlas',
-      data: atlasBuffer,
-      path: atlasPath
-    };
-
-    // find png file
-    const pngString = atlasBuffer.toString('utf8');
-    let atlas = new TextureAtlas(pngString);
-
-    const textureFiles: SpineRawData[] = []
-    atlas.pages.forEach(page => {
-      const textureFile = path.join(basePath, page.name)
-      if (fs.existsSync(textureFile)) {
-        const textureBuffer = fs.readFileSync(textureFile);
-        textureFiles.push({
-          name: page.name,
-          data: textureBuffer,
-          path: textureFile
-        })
-      }
+ipcMain.answerRenderer('open-file', async () => {
+  try {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile', 'multiSelections'],
+      filters: [
+        {
+          name: '*.skel, *.json, *.atlas',
+          extensions: ['skel', 'json', 'atlas']
+        }
+      ]
     })
-    result.textureFiles = textureFiles
+    if (!validFileList(result.filePaths)) return
+    const fileList = await getResources(result.filePaths, BrowserWindow.getAllWindows()[0])
+    return fileList
+  } catch (error) {
+    return error
   }
+})
 
-  return result;
-});
+
 const createWindow = () => {
   // Create the browser window.
   const mainWindow = new BrowserWindow({

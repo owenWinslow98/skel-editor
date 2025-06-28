@@ -1,3 +1,11 @@
+interface webUtils {
+    getPathForFile(file: File): string;
+}
+
+interface RendererProcessIpc {
+    callMain: (channel: string, data?: any) => Promise<any>;
+    answerMain: (channel: string, callback: (data: any) => void) => void;
+}
 interface Window {
     electronAPI: {
         minimize: () => void;
@@ -22,5 +30,7 @@ interface Window {
             }[];
             fileVersion: string;
         } | null>;
+        ipc: RendererProcessIpc;
+        webUtils: webUtils;
     }
 }

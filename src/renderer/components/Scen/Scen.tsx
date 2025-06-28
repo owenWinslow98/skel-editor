@@ -1,117 +1,173 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { isNull } from 'lodash';
-import * as spine from 'spine-webgl40';
-import { initPixi, spriteMap, TILE_SIZE } from './PixiUtil';
-import { Application, Container, Graphics, Point } from 'pixi.js';
-import { app } from 'electron';
-import { useSelector } from 'react-redux';
-import { RootState } from '@/renderer/store';
-import { setMousePosition } from '@/renderer/store/CanvasSlice';
-import { useAppDispatch } from '@/renderer/hooks/redux';
+// import * as spine from 'spine-webgl40';
+import { initPixi, spriteMap } from './PixiUtil';
+import { Application, Point, Assets, Sprite, } from 'pixi.js';
+import { setBonesTreeData } from '@/renderer/store/canvasSlice';
+import { useAppDispatch, useAppSelector } from '@/renderer/hooks/redux';
+import { Viewport } from 'pixi-viewport';
+import * as spine from '../../lib/spine/spine-pixi/src'
+import { SpineDebugRenderer } from '../../lib/spine/spine-pixi/src/SpineDebugRenderer';
+import { TreeDataItem } from '../../ui/tree-view';
 
-// const MAX_SCALE = 10
-
-const MIN_SCALE = 0.2;
-const MAX_SCALE = 4.0;
-
+interface TreeNode extends TreeDataItem {
+    children: TreeNode[]
+}
 const Scene: React.FC<{ className: string }> = ({ className }) => {
     const canvasRef = useRef<HTMLCanvasElement>(null)
-    const scale = useRef(1)
-    const [scaleNum, setScaleNum] = useState(1)
+    const containerRef = useRef<HTMLDivElement>(null)
     const dispatch = useAppDispatch();
-
-    const skeletonRef = useRef<spine.Skeleton>(null)
+    const { currentSpineAssets } = useAppSelector(state => state.global);
 
     const pixiAppRef = useRef<{ app: Application, spriteMap: spriteMap }>(null)
-    // const [isPixiAppReady, setIsPixiAppReady] = useState(false)
+    const [isPixiAppReady, setIsPixiAppReady] = useState(false)
+
+
+    const initSpineAnimation = async (pixiApp: { app: Application, spriteMap: spriteMap }) => {
+        try {
+            const { app, spriteMap } = pixiApp
+            const viewport = spriteMap.get('viewport') as Viewport
+            const spineboy = await spine.Spine.fromRaw(currentSpineAssets, {
+                scale: 1
+            });
+            const originPoint = spriteMap.get('originPoint') as Point
+            spineboy.x = originPoint.x
+            spineboy.y = originPoint.y
+
+            // 创建调试渲染器实例
+            const debugRenderer = new SpineDebugRenderer();
+            // 可以配置调试选项
+            debugRenderer.drawBones = true;
+            debugRenderer.drawBoundingBoxes = false;
+            debugRenderer.drawRegionAttachments = false;
+            debugRenderer.drawPaths = false;
+            debugRenderer.drawMeshTriangles = false;
+            debugRenderer.drawMeshHull = false;
+            debugRenderer.drawClipping = false;
+            debugRenderer.drawEvents = false;
+            spineboy.debug = debugRenderer;
+
+            const { bones } = spineboy.skeleton.data
+            const bonesMap = new Map<string, TreeDataItem>()
+            const boneRoot: TreeDataItem = { id: '0', name: 'root', children: [] }
+            bonesMap.set(boneRoot.id, boneRoot)
+            bones.forEach((bone) => {
+                if (isNull(bone.parent)) return
+                const treeNode: TreeDataItem = {
+                    id: bone.index.toString(),
+                    name: bone.name,
+                    children: null
+                }
+                bonesMap.set(treeNode.id, treeNode)
+                const parentNode = bonesMap.get(bone.parent.index.toString())
+                if (isNull(parentNode.children)) parentNode.children = []
+                parentNode.children.push(treeNode)
+            })
+            dispatch(setBonesTreeData(boneRoot))
+            // initBones(bonesData)
+            // spineboy.state.setAnimation(0, spineboy.state.data.skeletonData.animations[0].name, true)
+            viewport.addChild(spineboy);
+        } catch (error) {
+            console.error('Spine 动画初始化失败:', error)
+        }
+    }
+
+    const initBones = (bonesData: any[]) => {
+        // const { bones } = useAppSelector((state) => state.canvas)
+        const { spriteMap } = pixiAppRef.current!
+        const viewport = spriteMap.get('viewport') as Viewport
+        const BoneSprite = spriteMap.get('BoneSprite') as typeof Sprite
+        const originPoint = spriteMap.get('originPoint') as Point
+
+        bonesData.forEach((bone) => {
+            const boneSprite = new BoneSprite()
+
+            boneSprite.x = bone.x
+            boneSprite.y = bone.y
+            const scale = bone.length / 5
+            boneSprite.scale.set(scale, 1)
+            boneSprite.rotation = bone.rotation || 0
+
+            viewport.addChild(boneSprite)
+        })
+    }
 
     useEffect(() => {
         (async () => {
-            pixiAppRef.current = await initPixi(canvasRef.current)
+            pixiAppRef.current = await initPixi(canvasRef.current, containerRef.current)
+            setIsPixiAppReady(true)
             windowResizeCallback()
+            // const { app } = pixiAppRef.current
+            // await    .load('../../assets/npc400011.skel')
+            // await Assets.load('../../assets/npc400011.atlas', {
+            //     dataParser: () => {
+            //         console.log('dataParser')
+            //     }
+            // })
+
+            // console.log(Assets)
+            // // 初始化 Spine 动画
+            // await initSpineAnimation(pixiAppRef.current)
+
         })()
-    }, [])
-    /*pixijs */
-    const moueMoveCallback = useCallback((e: MouseEvent) => {
-        const screen = new Point(e.clientX, e.clientY);
-        const { spriteMap, app } = pixiAppRef.current!
-        const world = spriteMap.get('world') as Container
-        const worldPos = world.toLocal(screen, app.stage);
-        const x = Number(worldPos.x.toFixed(1))
-        const y = Number(worldPos.y.toFixed(1))
-
-        dispatch(setMousePosition({ x, y }))
-    }, [])
-    const wheelResizeCallback = useCallback((e: WheelEvent) => {
-        e.preventDefault();
-        if (isNull(pixiAppRef.current)) return
-
-        const scaleFactor = e.deltaY < 0 ? 1.1 : 0.9;
-        
-        const count = e.deltaY < 0 ? scale.current + 1 : scale.current - 1;
-        scale.current = count
-        setScaleNum(count)
-        const { spriteMap } = pixiAppRef.current!
-
-
-        const world = spriteMap.get('world') as Container
-        const cross = spriteMap.get('cross') as Graphics
-        const grid = spriteMap.get('grid') as Graphics
-        const app = pixiAppRef.current!.app
-
-
-        const mouse = new Point(e.clientX, e.clientY);
-        const worldBefore = world.toLocal(mouse, app.stage);
-        let newScale = world.scale.x * scaleFactor;
-        newScale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, newScale)); 
-
-        // world.scale.x *= scaleFactor;
-        // world.scale.y *= scaleFactor;
-        world.scale.set(newScale, newScale);
-        const worldAfter = world.toLocal(mouse, app.stage);
-
-        world.x += (worldAfter.x - worldBefore.x) * world.scale.x;
-        world.y += (worldAfter.y - worldBefore.y) * world.scale.y;
-
-
-
-        // const { spriteMap } = pixiAppRef.current!
-        // const background = spriteMap.get('background') as TilingSprite
-
-        // let scaleNum = parseFloat((scale.current -(e.deltaY / 1000)).toFixed(1));
-        // if ((scaleNum == MIN_SCALE && e.deltaY < 0) || (scaleNum == MAX_SCALE && e.deltaY > 0)) return
-        // scaleNum = scaleNum < MIN_SCALE ? MIN_SCALE : scaleNum > MAX_SCALE ? MAX_SCALE : scaleNum;
-        // scale.current = scaleNum
-        // background.tileScale.set(scaleNum, scaleNum)
-    }, [])
-
-    const windowResizeCallback = useCallback(() => {
-        // const { spriteMap } = pixiAppRef.current!
-        // const backgroundTexture = spriteMap.get('backgroundTexture') as TilingSprite
-        // const { innerWidth, innerHeight } = window
-        // backgroundTexture.width = innerWidth
-        // backgroundTexture.height = innerHeight
     }, [])
 
     useEffect(() => {
-        canvasRef.current!.addEventListener('wheel', wheelResizeCallback)
+        (async () => {
+            if (isNull(currentSpineAssets)) return
+            Assets.reset()
+            const { skel, atlas, json, skins } = currentSpineAssets
+            const isSkelFile = skel.file !== null
+            initSpineAnimation(pixiAppRef.current)
+            // Assets.addBundle('spine', [currentSpineAssets.skel.file, currentSpineAssets.atlas.file])
+
+
+            // await Assets.load(currentSpineAssets.skel.file)
+            // await Assets.load(currentSpineAssets.atlas.file)
+            // await initSpineAnimation(pixiAppRef.current)
+        })()
+    }, [currentSpineAssets])
+    /*pixijs */
+
+    const windowResizeCallback = useCallback(() => {
+        if (!pixiAppRef.current) return
+        const { spriteMap } = pixiAppRef.current!
+        const viewport = spriteMap.get('viewport') as Viewport
+        if (!viewport) return
+
+        viewport.resize(window.innerWidth, window.innerHeight)
+    }, [])
+
+    useEffect(() => {
         window.addEventListener('resize', windowResizeCallback)
-        canvasRef.current!.addEventListener('mousemove', moueMoveCallback)
+        const observer = new ResizeObserver((entries) => {
+            for (const entry of entries) {
+                const { width, height } = entry.contentRect;
+                canvasRef.current!.width = width
+                canvasRef.current!.height = height
+                const { app, spriteMap } = pixiAppRef.current!
+                const viewport = spriteMap.get('viewport') as Viewport
+
+                canvasRef.current!.style.width = `${width}px`
+                canvasRef.current!.style.height = `${height}px`
+                viewport.resize(width, height)
+            }
+        })
+        observer.observe(containerRef.current!)
         return () => {
-            canvasRef.current!.removeEventListener('wheel', wheelResizeCallback)
             window.removeEventListener('resize', windowResizeCallback)
-            canvasRef.current!.removeEventListener('mousemove', moueMoveCallback)
+            observer.disconnect()
         }
     }, [])
 
+    useEffect(() => {
 
+    }, [])
 
     return (
-        <div className={className} style={{ margin: 0, padding: 0, background: '#333' }}>
+        <div className={className} ref={containerRef} style={{ margin: 0, padding: 0, background: '#333', flex: 1, overflow: 'hidden' }}>
             <canvas
                 ref={canvasRef}
-            // width={3840}
-            // height={2160}
             />
         </div>
     );

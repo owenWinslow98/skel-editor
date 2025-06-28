@@ -9,7 +9,7 @@ export interface CoordProps {
 
 export const Coord: React.FC<CoordProps> = ({ className }) => {
 
-    const { mouseX, mouseY } = useSelector((state: RootState) => state.canvas)
+    const { mouseX, mouseY, scale } = useSelector((state: RootState) => state.canvas)
     useEffect(() => {
         // Create container for the coordinate bar
 
@@ -24,7 +24,7 @@ export const Coord: React.FC<CoordProps> = ({ className }) => {
     // This component doesn't render anything in React
     // It just manages the PixiJS objects
     return (<div className={className}>
-        {mouseX}, {mouseY}
+        {mouseX}, {mouseY}, {scale}
     </div>);
 };
 

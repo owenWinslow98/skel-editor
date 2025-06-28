@@ -1,28 +1,103 @@
 
-export function readVersionFromSkel(fileBuffer: NonSharedBuffer) {
-    function readVarInt(buf: NonSharedBuffer, offset: number): { value: number, nextOffset: number } {
-        let b: number, result = 0, shift = 0;
-        do {
-            b = buf[offset++];
-            result |= (b & 0x7F) << shift;
-            shift += 7;
-        } while (b & 0x80);
-        return { value: result, nextOffset: offset };
-    }
-    function extractVersion(raw: string): string | null {
-        const match = raw.match(/\d+\.\d+/);
-        return match ? match[0] : null;
-    }
-    function readString(buf: NonSharedBuffer, offset: number): { value: string | null, nextOffset: number } {
-        const { value: length, nextOffset } = readVarInt(buf, offset);
-        if (length === 0) return { value: null, nextOffset };
+import fs from 'fs'
+import { isNull } from 'lodash'
+import { BrowserWindow } from 'electron'
+import { ipcMain } from 'electron-better-ipc'
+import path from 'path'
+import { getJsonVersion, getSkelVersion } from './getResource'
 
-        const endOffset = nextOffset + length - 1; // -1 是因为 Spine 字符串以 null terminator 结尾
-        const str = buf.toString('utf8', nextOffset, endOffset);
-        return { value: str, nextOffset: endOffset };
+interface Resource {
+    name: string
+    path: string
+    file: Uint8Array | null
+}
+export const getResources = async (filePathList: string[], mainWindow: BrowserWindow) => {
+
+
+    const skelPath = filePathList.find(path => path.endsWith('.skel'))! || null
+    const jsonPath = filePathList.find(path => path.endsWith('.json'))! || null
+    const atlasPath = filePathList.find(path => path.endsWith('.atlas'))! || null
+
+    if (!((!isNull(skelPath)) || (!isNull(jsonPath))) && !isNull(atlasPath)) {
+        ipcMain.callRenderer(mainWindow, 'toast-message', `both skel(.skel, .json) and teture(.atlas) are required.`)
+        throw new Error('both skel(.skel, .json) and teture(.atlas) are required.')
+
+
     }
-    // 第二个字符串：version
-    const versionAndHash = readString(fileBuffer, 0);
-    const version = extractVersion(versionAndHash.value)
-    return version;
+    let skelfile
+    let jsonfile
+    let atlasfile
+    let skelVersion
+    try {
+        skelfile = isNull(skelPath) ? null : fs.readFileSync(skelPath)
+        jsonfile = isNull(jsonPath) ? null : fs.readFileSync(jsonPath)
+        skelVersion = isNull(skelPath) ? getJsonVersion(jsonfile) : getSkelVersion(skelfile)
+        atlasfile = fs.readFileSync(atlasPath as string)
+    } catch (error) {
+        ipcMain.callRenderer(mainWindow, 'toast-message', `${error}`)
+        throw new Error('read file error.')
+    }
+
+    let skelResource: Resource = {
+        name: '',
+        path: '',
+        file: null
+    }
+    if (!isNull(skelPath)) {
+        skelResource.name = path.basename(skelPath)
+        skelResource.path = skelPath
+        skelResource.file = skelfile
+    }
+
+    let jsonResource: Resource = {
+        name: '',
+        path: '',
+        file: null
+    }
+    if (!isNull(jsonPath)) {
+        jsonResource.name = path.basename(jsonPath)
+        jsonResource.path = jsonPath
+        jsonResource.file = jsonfile
+    }
+
+    // atlas
+    let atlasResource: Resource = {
+        name: '',
+        path: '',
+        file: null
+    }
+    if (!isNull(atlasPath)) {
+        atlasResource.name = path.basename(atlasPath)
+        atlasResource.path = atlasPath
+        atlasResource.file = atlasfile
+    }
+
+    // atlas png list
+    const atlasText = new TextDecoder('utf-8').decode(atlasfile)
+
+    let pngList = await ipcMain.callRenderer(mainWindow, 'get-atlas-png-list', { atlasText }) as string[]
+    if (pngList.length === 0) throw Error(`.atlas has not skin.`)
+    const skinList = pngList.map((pathUri) => {
+        const abPath = path.join(path.dirname(atlasPath as string), pathUri)
+        try {
+            const fsRaw = fs.readFileSync(abPath)
+            return {
+                name: pathUri,
+                path: abPath,
+                file: fsRaw
+            }
+        } catch (error) {
+            ipcMain.callRenderer(mainWindow, 'toast-message', `${error}`)
+            throw new Error(`${abPath} file not found or broken.`)
+        }
+    })
+
+    const result = {
+        skel: skelResource,
+        json: jsonResource,
+        atlas: atlasResource,
+        skins: skinList,
+        skelVersion: skelVersion
+    }
+    return result
 }

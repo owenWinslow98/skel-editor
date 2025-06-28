@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit';
-
+import { SkeletonData, Spine } from '@/renderer/lib/spine/spine-pixi/src';
+import { type TreeDataItem } from '../ui/tree-view';
 // 定义画布状态的类型
 interface CanvasState {
   // 画布尺寸
@@ -32,8 +33,18 @@ interface CanvasState {
   showCoordinates: boolean;
   mouseX: number;
   mouseY: number;
+  skeletonData: Spine | null;
+  bones: BoneData[]
+  bonesTreeData: TreeDataItem
 }
 
+interface BoneData {
+  name: string;
+  x: number;
+  y: number;
+  length: number;
+  rotation: number;
+}
 // 初始状态
 const initialState: CanvasState = {
   width: 1920,
@@ -59,6 +70,9 @@ const initialState: CanvasState = {
   showCoordinates: true,
   mouseX: 0,
   mouseY: 0,
+  skeletonData: null,
+  bones: [],
+  bonesTreeData: { id: '0', name: 'root', children: null }
 };
 
 // 创建 slice
@@ -74,7 +88,7 @@ const canvasSlice = createSlice({
     
     // 缩放控制
     setScale: (state, action: PayloadAction<number>) => {
-      state.scale = Math.max(state.minScale, Math.min(state.maxScale, action.payload));
+      state.scale = action.payload
     },
     
     setScaleLimits: (state, action: PayloadAction<{ min: number; max: number }>) => {
@@ -144,13 +158,21 @@ const canvasSlice = createSlice({
     },
     
     setMousePosition: (state, action: PayloadAction<{ x: number; y: number }>) => {
-      console.log(action.payload)
       state.mouseX = action.payload.x;
       state.mouseY = action.payload.y;
     },
     
     // 重置画布状态
     resetCanvasState: () => initialState,
+    setSkeletonData: (state, action: PayloadAction<SkeletonData>) => {
+      // state.skeletonData = action.payload;
+    },
+    setBonesData: (state, action: PayloadAction<BoneData[]>) => {
+      state.bones = action.payload;
+    },
+    setBonesTreeData: (state, action: PayloadAction<TreeDataItem>) => {
+      state.bonesTreeData = action.payload;
+    }
   },
 });
 
@@ -174,6 +196,9 @@ export const {
   toggleCoordinates,
   setMousePosition,
   resetCanvasState,
+  setSkeletonData,
+  setBonesData,
+  setBonesTreeData
 } = canvasSlice.actions;
 
 // 导出 reducer
