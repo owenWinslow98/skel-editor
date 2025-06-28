@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { isNull } from 'lodash';
 // import * as spine from 'spine-webgl40';
 import { initPixi, spriteMap } from './PixiUtil';
-import { Application, Point, Assets, Sprite, } from 'pixi.js';
+import { Application, Point, Assets, Sprite, ALPHA_MODES, } from 'pixi.js';
 import { setBonesTreeData } from '@/renderer/store/canvasSlice';
 import { useAppDispatch, useAppSelector } from '@/renderer/hooks/redux';
 import { Viewport } from 'pixi-viewport';
@@ -25,11 +25,20 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
 
     const initSpineAnimation = async (pixiApp: { app: Application, spriteMap: spriteMap }) => {
         try {
-            const { app, spriteMap } = pixiApp
+            const { spriteMap } = pixiApp
             const viewport = spriteMap.get('viewport') as Viewport
-            const spineboy = await spine.Spine.fromRaw(currentSpineAssets, {
+
+            const { skins, atlas, json, skel } = currentSpineAssets
+            skins.map((skin) => {
+                Assets.add({ alias: skin.name, src: skin.file as string, loadParser: 'loadTextures', format: 'png', data: { alphaMode: skin.pma ? ALPHA_MODES.PMA : ALPHA_MODES.UNPACK } })
+            })
+            Assets.add({ alias: skel.name, src: skel.file as string, loadParser: 'spineSkeletonLoader', format: 'skel' })
+            Assets.add({ alias: atlas.name, src: atlas.file as string, loadParser: 'spineTextureAtlasLoader', format: 'atlas' })
+            await Assets.load(skel.name)
+            await Assets.load(atlas.name)
+            const spineboy = await spine.Spine.from(skel.name, atlas.name, {
                 scale: 1
-            });
+            })
             const originPoint = spriteMap.get('originPoint') as Point
             spineboy.x = originPoint.x
             spineboy.y = originPoint.y
@@ -49,13 +58,13 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
 
             const { bones } = spineboy.skeleton.data
             const bonesMap = new Map<string, TreeDataItem>()
-            const boneRoot: TreeDataItem = { id: '0', name: 'root', children: [] }
+            const boneRoot: TreeDataItem = { id: '0', name: '0-root', children: [] }
             bonesMap.set(boneRoot.id, boneRoot)
             bones.forEach((bone) => {
                 if (isNull(bone.parent)) return
                 const treeNode: TreeDataItem = {
                     id: bone.index.toString(),
-                    name: bone.name,
+                    name: `${bone.index}-${bone.name}`,
                     children: null
                 }
                 bonesMap.set(treeNode.id, treeNode)
@@ -65,7 +74,10 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
             })
             dispatch(setBonesTreeData(boneRoot))
             // initBones(bonesData)
-            // spineboy.state.setAnimation(0, spineboy.state.data.skeletonData.animations[0].name, true)
+            // spineboy.skeleton.setToSetupPose();
+            spineboy.state.setAnimation(0, spineboy.state.data.skeletonData.animations[1].name, true)
+            const list = spineboy.state.data.skeletonData.animations
+
             viewport.addChild(spineboy);
         } catch (error) {
             console.error('Spine 动画初始化失败:', error)
@@ -73,7 +85,6 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
     }
 
     const initBones = (bonesData: any[]) => {
-        // const { bones } = useAppSelector((state) => state.canvas)
         const { spriteMap } = pixiAppRef.current!
         const viewport = spriteMap.get('viewport') as Viewport
         const BoneSprite = spriteMap.get('BoneSprite') as typeof Sprite
@@ -97,17 +108,6 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
             pixiAppRef.current = await initPixi(canvasRef.current, containerRef.current)
             setIsPixiAppReady(true)
             windowResizeCallback()
-            // const { app } = pixiAppRef.current
-            // await    .load('../../assets/npc400011.skel')
-            // await Assets.load('../../assets/npc400011.atlas', {
-            //     dataParser: () => {
-            //         console.log('dataParser')
-            //     }
-            // })
-
-            // console.log(Assets)
-            // // 初始化 Spine 动画
-            // await initSpineAnimation(pixiAppRef.current)
 
         })()
     }, [])
@@ -119,12 +119,6 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
             const { skel, atlas, json, skins } = currentSpineAssets
             const isSkelFile = skel.file !== null
             initSpineAnimation(pixiAppRef.current)
-            // Assets.addBundle('spine', [currentSpineAssets.skel.file, currentSpineAssets.atlas.file])
-
-
-            // await Assets.load(currentSpineAssets.skel.file)
-            // await Assets.load(currentSpineAssets.atlas.file)
-            // await initSpineAnimation(pixiAppRef.current)
         })()
     }, [currentSpineAssets])
     /*pixijs */

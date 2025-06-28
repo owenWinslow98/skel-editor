@@ -7,6 +7,10 @@ interface SpineFile {
   name: string,
 }
 
+interface SpineSkin extends SpineFile {
+  pma: boolean;
+}
+
 interface SpineRawData {
   name: string;
   data: Uint8Array;
@@ -17,7 +21,7 @@ interface SpineAssets {
   skel: SpineFile | null;
   atlas: SpineFile | null;
   json: SpineFile | null;
-  skins: SpineFile[] | null;
+  skins: SpineSkin[] | null;
   fileVersion: string;
 }
 

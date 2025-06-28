@@ -6,6 +6,7 @@ import store from './store';
 import { Provider } from 'react-redux';
 import Panel from './components/Panel';
 import ResourcePanel from './layout/ResourcePanel';
+import TimePanel from './layout/TimePanel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
 import { useAppSelector } from './hooks/redux';
 import { getAtlasPngList } from './lib/utils';
@@ -49,8 +50,10 @@ const App: React.FC = () => {
               <ResourcePanel />
             </ResizablePanel>
           </ResizablePanelGroup> */}
-        <Scene className='flex-1' />
-
+        <div className='flex-1 flex flex-col'>
+          <Scene className='flex-1' />
+          <TimePanel />
+        </div>
         <ResourcePanel />
       </div>
       <Toaster />

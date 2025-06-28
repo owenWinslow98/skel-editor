@@ -1,16 +1,16 @@
 /******************************************************************************
  * Spine Runtimes License Agreement
- * Last updated July 28, 2023. Replaces all prior versions.
+ * Last updated April 5, 2025. Replaces all prior versions.
  *
- * Copyright (c) 2013-2023, Esoteric Software LLC
+ * Copyright (c) 2013-2025, Esoteric Software LLC
  *
  * Integration of the Spine Runtimes into software or otherwise creating
  * derivative works of the Spine Runtimes is permitted under the terms and
  * conditions of Section 2 of the Spine Editor License Agreement:
  * http://esotericsoftware.com/spine-editor-license
  *
- * Otherwise, it is permitted to integrate the Spine Runtimes into software or
- * otherwise create derivative works of the Spine Runtimes (collectively,
+ * Otherwise, it is permitted to integrate the Spine Runtimes into software
+ * or otherwise create derivative works of the Spine Runtimes (collectively,
  * "Products"), provided that each user of the Products must obtain their own
  * Spine Editor license and redistribution of the Products in any form must
  * include this license and copyright notice.
@@ -23,13 +23,14 @@
  * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES,
  * BUSINESS INTERRUPTION, OR LOSS OF USE, DATA, OR PROFITS) HOWEVER CAUSED AND
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THE
- * SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THE SPINE RUNTIMES, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *****************************************************************************/
-import { TextureAtlas } from "../../../spine-core/src";
+
+import { TextureAtlas } from "@esotericsoftware/spine-core";
 import { SpineTexture } from "../SpineTexture.js";
-import type { AssetExtension, Loader } from "@pixi/assets";
-import { Assets } from "@pixi/assets";
+import type { AssetExtension, Loader, UnresolvedAsset } from "@pixi/assets";
+import { Assets, copySearchParams } from "@pixi/assets";
 import { LoaderParserPriority, checkExtension } from "@pixi/assets";
 import type { Texture } from "@pixi/core";
 import { ALPHA_MODES, ExtensionType, settings, utils, BaseTexture, extensions } from "@pixi/core";
@@ -39,8 +40,19 @@ type RawAtlas = string;
 const spineTextureAtlasLoader: AssetExtension<RawAtlas | TextureAtlas, ISpineAtlasMetadata> = {
 	extension: ExtensionType.Asset,
 
+	resolver: {
+		test: (value: string): boolean => checkExtension(value, ".atlas"),
+		parse: (value: string): UnresolvedAsset => {
+			const split = value.split('.');
+			return {
+				resolution: parseFloat(settings.RETINA_PREFIX?.exec(value)?.[1] ?? '1'),
+				format: split[split.length - 2],
+				src: value,
+			};
+		},
+	},
+
 	loader: {
-		name: "spineTextureAtlasLoader",
 		extension: {
 			type: ExtensionType.LoadParser,
 			priority: LoaderParserPriority.Normal,
@@ -53,12 +65,14 @@ const spineTextureAtlasLoader: AssetExtension<RawAtlas | TextureAtlas, ISpineAtl
 
 		async load(url: string): Promise<RawAtlas> {
 			const response = await settings.ADAPTER.fetch(url);
+
 			const txt = await response.text();
+
 			return txt;
 		},
 
-		testParse(asset: unknown, options: {src: string, format?: string}): Promise<boolean> {
-			const isExtensionRight = options.format === 'atlas'
+		testParse(asset: unknown, options: {src: string}): Promise<boolean> {
+			const isExtensionRight = checkExtension(options.src, ".atlas");
 			const isString = typeof asset === "string";
 
 			return Promise.resolve(isExtensionRight && isString);
@@ -108,14 +122,11 @@ const spineTextureAtlasLoader: AssetExtension<RawAtlas | TextureAtlas, ISpineAtl
 					page.setTexture(SpineTexture.from(providedPage));
 				} else {
 					const url: string = providedPage ?? utils.path.normalize([...basePath.split(utils.path.sep), pageName].join(utils.path.sep));
-					const assetsToLoadIn = { src: pageName, data: { ...metadata.imageMetadata, ...{ alphaMode: page.pma ? ALPHA_MODES.PMA : ALPHA_MODES.UNPACK } } };
-					const pixiPromise = Assets.load(pageName).then((texture) => {
-						page.setTexture(SpineTexture.from(texture.baseTexture));
-					})
-					// const pixiPromise = loader.load<Texture>(assetsToLoadIn)
-					// 	.then((texture) => {
-					// 		page.setTexture(SpineTexture.from(texture.baseTexture));
-					// 	});
+					const assetsToLoadIn = { src: copySearchParams(url, options.src as string), data: { ...metadata.imageMetadata, ...{ alphaMode: page.pma ? ALPHA_MODES.PMA : ALPHA_MODES.UNPACK } } };
+					const pixiPromise = loader.load<Texture>(assetsToLoadIn)
+						.then((texture) => {
+							page.setTexture(SpineTexture.from(texture.baseTexture));
+						});
 					textureLoadingPromises.push(pixiPromise);
 				}
 			}

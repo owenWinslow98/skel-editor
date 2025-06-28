@@ -75,16 +75,18 @@ export const getResources = async (filePathList: string[], mainWindow: BrowserWi
     // atlas png list
     const atlasText = new TextDecoder('utf-8').decode(atlasfile)
 
-    let pngList = await ipcMain.callRenderer(mainWindow, 'get-atlas-png-list', { atlasText }) as string[]
-    if (pngList.length === 0) throw Error(`.atlas has not skin.`)
-    const skinList = pngList.map((pathUri) => {
-        const abPath = path.join(path.dirname(atlasPath as string), pathUri)
+    let pageList = await ipcMain.callRenderer(mainWindow, 'get-atlas-png-list', { atlasText }) as {name: string, pma: boolean}[]
+    if (pageList.length === 0) throw Error(`.atlas has not skin.`)
+    const skinList = pageList.map((page) => {
+        const fileName = page.name
+        const abPath = path.join(path.dirname(atlasPath as string), fileName)
         try {
             const fsRaw = fs.readFileSync(abPath)
             return {
-                name: pathUri,
+                name: fileName,
                 path: abPath,
-                file: fsRaw
+                file: fsRaw,
+                pma: page.pma
             }
         } catch (error) {
             ipcMain.callRenderer(mainWindow, 'toast-message', `${error}`)

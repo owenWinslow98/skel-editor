@@ -8,6 +8,5 @@ export function cn(...inputs: ClassValue[]) {
 
 export const getAtlasPngList = (atlasText: string) => {
     const atlas = new TextureAtlas(atlasText)
-    const list = atlas.pages.map((page) => page.name)
-    return list
+    return atlas.pages
   }

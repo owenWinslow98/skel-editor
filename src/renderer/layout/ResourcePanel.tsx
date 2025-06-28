@@ -35,7 +35,6 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ className = '' }) => {
                                 initialSelectedItemId="0"
                                 onSelectChange={(item) => {
                                     setSelectedItem(item)
-                                    console.log(item)
                                 }}
                                 onDocumentDrag={handleDocumentDrag}
                                 className="h-full"
