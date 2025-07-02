@@ -19,6 +19,7 @@ process.stdout.write = ((write) => {
 
 const validFileList = (fileList: string[]): boolean => {
   const mainWindow = BrowserWindow.getAllWindows()[0]
+  if (fileList.length === 0) return false;
   if (fileList.length < 2) {
     ipcMain.callRenderer(mainWindow, 'toast-message', 'at least two files are required.')
     return false;

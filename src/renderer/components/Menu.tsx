@@ -14,7 +14,7 @@ import {
 import { setSpineAssets, SpineAssets, toggleBlackUISkin } from '../store/globalSlice';
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { Eclipse, House } from 'lucide-react';
-import { isEmpty, isNull } from 'lodash';
+import { isEmpty, isNull, isUndefined } from 'lodash';
 
 
 
@@ -23,7 +23,7 @@ interface skin {
     path: string;
     file: Uint8Array;
 }
-const Menu: React.FC = () => {
+const Menu: React.FC<{ className?: string }> = ({ className }) => {
     const dispatch = useAppDispatch();
     const { currentSpineAssets } = useAppSelector(state => state.global);
 
@@ -50,6 +50,7 @@ const Menu: React.FC = () => {
         const { ipc } = window.electronAPI;
         try {
             const fileData = await ipc.callMain('open-file') as any;
+            if(isUndefined(fileData)) return
             const { skel, json, atlas, skins, skelVersion } = fileData
             const transformSkel = isNull(skel.file) ? null : URL.createObjectURL(new Blob([skel.file], { type: 'application/octet-stream' }))
             const transformJson = isNull(json.file) ? null : URL.createObjectURL(new Blob([json.file], { type: 'application/json' }))
@@ -99,7 +100,7 @@ const Menu: React.FC = () => {
 
     }, []);
     return (
-        <div className="flex justify-between items-center select-none drag bg-background border-b border-border">
+        <div className={`flex justify-between items-center select-none drag bg-background border-b border-border ${className}`}>
             {/* 左侧菜单 */}
             <div className="flex no-drag">
                 <div className='flex px-2 items-center justify-center border-r border-border text-foreground hover:bg-accent cursor-pointer' onClick={resetHome}>

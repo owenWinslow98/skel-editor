@@ -2,17 +2,36 @@ import React, { useState } from 'react';
 import { TreeView, type TreeDataItem } from '../ui/tree-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../ui/tabs";
 import { FileIcon, FolderIcon, ImageIcon, VideoIcon, MusicIcon, FileTextIcon } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 
+import { PageTexturePanel } from '../components/Panel/PageTexturePanel';
+import { AnimationPanel } from '../components/Panel/AnimationPanel';
+import { KeepAliveTabsContent } from '../ui/keep-alive-tab-content';
+import { setCurrentAnimation } from '../store/canvasSlice';
+import { currentSpineInstanceData } from '../components/Scen/SpineUtil';
 interface ResourcePanelProps {
     className?: string;
 }
 
 const ResourcePanel: React.FC<ResourcePanelProps> = ({ className = '' }) => {
     const [selectedItem, setSelectedItem] = useState<TreeDataItem | undefined>();
-    const bonesTreeData = useSelector((state: RootState) => state.canvas.bonesTreeData)
+    const { bonesTreeData, currentSpineData, currentAnimation } = useSelector((state: RootState) => state.canvas)
+    const { atlas, skel } = currentSpineData
+    const dispatch = useDispatch()
 
+    const [tab, setTab] = React.useState("bones")
+
+    const setAnimation = (animation: string) => {
+        const { spineInstance } = currentSpineInstanceData
+        if(animation === currentAnimation) {
+            spineInstance.state.setEmptyAnimation(0)
+        } else {
+            spineInstance.state.setAnimation(0, animation, true)
+        }
+
+        dispatch(setCurrentAnimation(animation === currentAnimation ? null : animation))
+    }
     // 处理拖拽
     const handleDocumentDrag = (sourceItem: TreeDataItem, targetItem: TreeDataItem) => {
         console.log('拖拽:', sourceItem.name, '到', targetItem.name);
@@ -20,54 +39,42 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ className = '' }) => {
     };
 
     return (
-        <div className={`w-64 bg-card border-l border-border flex flex-col h-full ${className}`}>
-            <div className="flex-1 overflow-hidden">
-                <Tabs defaultValue="bones" className="h-full flex flex-col">
-                    <TabsList className="w-full border-b border-border">
-                        <TabsTrigger value="bones" className="flex-1">Bones</TabsTrigger>
-                        <TabsTrigger value="resources" className="flex-1">资源</TabsTrigger>
-                        <TabsTrigger value="animation" className="flex-1">动画</TabsTrigger>
-                    </TabsList>
-                    <TabsContent value="bones" className="flex-1 ">
-                        <div className="space-y-2 overflow-auto">
-                            <TreeView
-                                data={[bonesTreeData]}
-                                initialSelectedItemId="0"
-                                onSelectChange={(item) => {
-                                    setSelectedItem(item)
-                                }}
-                                onDocumentDrag={handleDocumentDrag}
-                                className="h-full"
-                            />
-                        </div>
-                    </TabsContent>
-                    <TabsContent value="resources" className="flex-1 overflow-hidden">
-                        232
-                    </TabsContent>
-
-
-                    <TabsContent value="animation" className="flex-1 p-4">
-                        <div className="space-y-2">
-                            <div className="text-sm font-medium text-foreground">动画列表</div>
-                            <div className="space-y-1">
-                                <div className="p-2 bg-secondary/50 rounded text-sm">idle</div>
-                                <div className="p-2 bg-secondary/50 rounded text-sm">walk</div>
-                                <div className="p-2 bg-secondary/50 rounded text-sm">run</div>
-                                <div className="p-2 bg-secondary/50 rounded text-sm">jump</div>
-                            </div>
-                        </div>
-                    </TabsContent>
-                </Tabs>
-            </div>
-
-            {/* 底部信息 */}
-            <div className="p-4 border-t border-border">
-                {selectedItem && (
-                    <div className="text-xs text-muted-foreground">
-                        选中: {selectedItem.name}
+        <div className={`bg-card border-l border-b border-border flex flex-col h-full ${className}`}>
+            <Tabs defaultValue="bones" onValueChange={setTab} className='h-full'>
+                <TabsList className="w-full border-b border-border">
+                    <TabsTrigger value="bones" className="flex-1">Bone</TabsTrigger>
+                    <TabsTrigger value="attachments" className="flex-1">Attachment</TabsTrigger>
+                    <TabsTrigger value="animation" className="flex-1">Animation</TabsTrigger>
+                    <TabsTrigger value="texture" className="flex-1">Texture</TabsTrigger>
+                    <TabsTrigger value="skin" className="flex-1">Skin</TabsTrigger>
+                </TabsList>
+                <KeepAliveTabsContent value="bones" activeValue={tab} className="flex-1 ">
+                    <div className="space-y-2 overflow-auto">
+                        <TreeView
+                            data={[bonesTreeData]}
+                            initialSelectedItemId="0"
+                            onSelectChange={(item) => {
+                                setSelectedItem(item)
+                            }}
+                            onDocumentDrag={handleDocumentDrag}
+                            className="h-full"
+                        />
                     </div>
-                )}
-            </div>
+                </KeepAliveTabsContent>
+                <KeepAliveTabsContent value="resources" activeValue={tab} className="flex-1 overflow-hidden">
+                    213123
+                </KeepAliveTabsContent>
+                <KeepAliveTabsContent value="animation" activeValue={tab} className="h-full px-2 ">
+                    <AnimationPanel animationList={skel?.animations} setAnimation={setAnimation} currentAnimation={currentAnimation} />
+                </KeepAliveTabsContent>
+
+                <KeepAliveTabsContent value="texture" activeValue={tab} className='h-full'>
+                    <PageTexturePanel pageAtlas={atlas} className='h-[calc(100%-2.25rem)]' />
+                </KeepAliveTabsContent>
+                <KeepAliveTabsContent value="skin" activeValue={tab} className='h-full'>
+                    skin
+                </KeepAliveTabsContent>
+            </Tabs>
         </div>
     );
 };

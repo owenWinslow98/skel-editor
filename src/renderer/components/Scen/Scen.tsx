@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { isNull } from 'lodash';
+import { isNull, debounce } from 'lodash';
 // import * as spine from 'spine-webgl40';
 import { initPixi, spriteMap } from './PixiUtil';
 import { Application, Point, Assets, Sprite, ALPHA_MODES, } from 'pixi.js';
@@ -9,7 +9,7 @@ import { Viewport } from 'pixi-viewport';
 import * as spine from '../../lib/spine/spine-pixi/src'
 import { SpineDebugRenderer } from '../../lib/spine/spine-pixi/src/SpineDebugRenderer';
 import { TreeDataItem } from '../../ui/tree-view';
-
+import { initTextureAtlas, initSkeletonStore } from './SpineUtil';
 interface TreeNode extends TreeDataItem {
     children: TreeNode[]
 }
@@ -35,13 +35,16 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
             Assets.add({ alias: skel.name, src: skel.file as string, loadParser: 'spineSkeletonLoader', format: 'skel' })
             Assets.add({ alias: atlas.name, src: atlas.file as string, loadParser: 'spineTextureAtlasLoader', format: 'atlas' })
             await Assets.load(skel.name)
-            await Assets.load(atlas.name)
+            const textureAtlas = await Assets.load(atlas.name)
+            initTextureAtlas(textureAtlas)
+            
             const spineboy = await spine.Spine.from(skel.name, atlas.name, {
                 scale: 1
             })
             const originPoint = spriteMap.get('originPoint') as Point
             spineboy.x = originPoint.x
             spineboy.y = originPoint.y
+            initSkeletonStore(spineboy)
 
             // 创建调试渲染器实例
             const debugRenderer = new SpineDebugRenderer();
@@ -75,9 +78,8 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
             dispatch(setBonesTreeData(boneRoot))
             // initBones(bonesData)
             // spineboy.skeleton.setToSetupPose();
-            spineboy.state.setAnimation(0, spineboy.state.data.skeletonData.animations[1].name, true)
+            // spineboy.state.setAnimation(0, spineboy.state.data.skeletonData.animations[2].name, true)
             const list = spineboy.state.data.skeletonData.animations
-
             viewport.addChild(spineboy);
         } catch (error) {
             console.error('Spine 动画初始化失败:', error)
@@ -133,7 +135,6 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
     }, [])
 
     useEffect(() => {
-        window.addEventListener('resize', windowResizeCallback)
         const observer = new ResizeObserver((entries) => {
             for (const entry of entries) {
                 const { width, height } = entry.contentRect;
@@ -141,15 +142,16 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
                 canvasRef.current!.height = height
                 const { app, spriteMap } = pixiAppRef.current!
                 const viewport = spriteMap.get('viewport') as Viewport
-
+                
                 canvasRef.current!.style.width = `${width}px`
                 canvasRef.current!.style.height = `${height}px`
-                viewport.resize(width, height)
+                viewport.resize(window.innerWidth, window.innerHeight)
+                app.renderer.resize(width, height);
             }
         })
         observer.observe(containerRef.current!)
         return () => {
-            window.removeEventListener('resize', windowResizeCallback)
+            // window.removeEventListener('resize', windowResizeCallback)
             observer.disconnect()
         }
     }, [])
@@ -159,7 +161,8 @@ const Scene: React.FC<{ className: string }> = ({ className }) => {
     }, [])
 
     return (
-        <div className={className} ref={containerRef} style={{ margin: 0, padding: 0, background: '#333', flex: 1, overflow: 'hidden' }}>
+        <div className={className} ref={containerRef} style={{ margin: 0, padding: 0, background: '#333', flex: 1
+         }}>
             <canvas
                 ref={canvasRef}
             />

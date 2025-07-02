@@ -93,12 +93,12 @@ export async function initPixi(canvas: HTMLCanvasElement, container: HTMLDivElem
 
     const originPoint = new Point(WORLD_WIDTH / 2, WORLD_HEIGHT / 2)
     viewport.moveCenter(originPoint)
-    viewport.on('pointermove', (event) => {
-        const worldPos = viewport.toWorld(event.global.x, event.global.y);
-        const relativeX = worldPos.x - originPoint.x;
-        const relativeY = worldPos.y - originPoint.y;
-        store.dispatch(setMousePosition({ x: Number(relativeX.toFixed(1)), y: Number(relativeY.toFixed(1)) }))
-    })
+    // viewport.on('pointermove', (event) => {
+    //     const worldPos = viewport.toWorld(event.global.x, event.global.y);
+    //     const relativeX = worldPos.x - originPoint.x;
+    //     const relativeY = worldPos.y - originPoint.y;
+    //     store.dispatch(setMousePosition({ x: Number(relativeX.toFixed(1)), y: Number(relativeY.toFixed(1)) }))
+    // })
 
     // 监听缩放事件 - pixi-viewport 5.x 的正确事件名称
     viewport.on('zoomed', () => {
