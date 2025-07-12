@@ -5,11 +5,13 @@ import { FileIcon, FolderIcon, ImageIcon, VideoIcon, MusicIcon, FileTextIcon } f
 import { useSelector, useDispatch } from 'react-redux';
 import { RootState } from '../store';
 
-import { PageTexturePanel } from '../components/Panel/PageTexturePanel';
+import { PageTexturePanel } from '../components/Panel/TexturePanel';
 import { AnimationPanel } from '../components/Panel/AnimationPanel';
 import { KeepAliveTabsContent } from '../ui/keep-alive-tab-content';
 import { setCurrentAnimation } from '../store/canvasSlice';
-import { currentSpineInstanceData } from '../components/Scen/SpineUtil';
+import { currentSpineInstanceData } from './Scen/SpineUtil';
+import { BonePanel } from '../components/Panel/BonePanel';
+
 interface ResourcePanelProps {
     className?: string;
 }
@@ -48,18 +50,8 @@ const ResourcePanel: React.FC<ResourcePanelProps> = ({ className = '' }) => {
                     <TabsTrigger value="texture" className="flex-1">Texture</TabsTrigger>
                     <TabsTrigger value="skin" className="flex-1">Skin</TabsTrigger>
                 </TabsList>
-                <KeepAliveTabsContent value="bones" activeValue={tab} className="flex-1 ">
-                    <div className="space-y-2 overflow-auto">
-                        <TreeView
-                            data={[bonesTreeData]}
-                            initialSelectedItemId="0"
-                            onSelectChange={(item) => {
-                                setSelectedItem(item)
-                            }}
-                            onDocumentDrag={handleDocumentDrag}
-                            className="h-full"
-                        />
-                    </div>
+                <KeepAliveTabsContent value="bones" activeValue={tab} className="flex-1 h-full">
+                    <BonePanel bonesTreeData={bonesTreeData} onSelectChange={setSelectedItem} handleDocumentDrag={handleDocumentDrag} />
                 </KeepAliveTabsContent>
                 <KeepAliveTabsContent value="resources" activeValue={tab} className="flex-1 overflow-hidden">
                     213123

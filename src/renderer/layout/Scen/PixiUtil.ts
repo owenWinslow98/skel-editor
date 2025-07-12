@@ -2,7 +2,7 @@ import { isNull } from 'lodash';
 import { Viewport } from 'pixi-viewport';
 import { Application, Container, Graphics, Sprite, Texture, Ticker, Text, TilingSprite, Point, RenderTexture } from 'pixi.js';
 import store from '@/renderer/store'; // 导入 store
-import { setMousePosition, setScale } from '@/renderer/store/CanvasSlice';
+import { setScale } from '@/renderer/store/canvasSlice';
 
 // 声明 globalThis 类型
 declare global {
@@ -16,7 +16,7 @@ export type spriteMap = Map<string, PixiEl | PixiClass>
 let pixiApp: { app: Application, spriteMap: spriteMap } | null = null
 
 export const TILE_SIZE = 50
-const darkGray = 0x1a1a1a; // 深灰色 - 世界外部
+export const WORLD_BACKGROUND = 0x1a1a1a; // 深灰色 - 世界外部
 
 
 const WORLD_WIDTH = 3840
@@ -26,8 +26,8 @@ export async function initPixi(canvas: HTMLCanvasElement, container: HTMLDivElem
     if (!isNull(pixiApp)) return pixiApp
     const app = new Application({
         view: canvas,
-        backgroundColor: darkGray, // 世界外部背景色
-        antialias: false, // 禁用抗锯齿以避免线条发虚
+        backgroundColor: WORLD_BACKGROUND, // 世界外部背景色
+        antialias: true, // 禁用抗锯齿以避免线条发虚
         autoDensity: true,
         resizeTo: container
     });

@@ -9,7 +9,7 @@ const treeVariants = cva(
 )
 
 const selectedTreeVariants = cva(
-    'before:opacity-100 before:bg-accent/70 text-accent-foreground'
+    'bg-muted/50 text-foreground'
 )
 
 const dragOverVariants = cva(
@@ -28,24 +28,35 @@ interface TreeDataItem {
     draggable?: boolean
     droppable?: boolean
     disabled?: boolean
+    length?: number
+}
+
+export interface TreeViewRef {
+    expandToNode: (nodeId: string) => void
+    expandAll: () => void
+    collapseAll: () => void
+    expandPath: (path: string[]) => void
+    getExpandedNodes: () => string[]
 }
 
 type TreeProps = React.HTMLAttributes<HTMLDivElement> & {
     data: TreeDataItem[] | TreeDataItem
     initialSelectedItemId?: string
     onSelectChange?: (item: TreeDataItem | undefined) => void
+    onHoverChange?: (item: TreeDataItem | undefined) => void
     expandAll?: boolean
     defaultNodeIcon?: any
     defaultLeafIcon?: any
     onDocumentDrag?: (sourceItem: TreeDataItem, targetItem: TreeDataItem) => void
 }
 
-const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
+const TreeView = React.forwardRef<TreeViewRef, TreeProps>(
     (
         {
             data,
             initialSelectedItemId,
             onSelectChange,
+            onHoverChange,
             expandAll,
             defaultLeafIcon,
             defaultNodeIcon,
@@ -60,6 +71,155 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
         >(initialSelectedItemId)
         
         const [draggedItem, setDraggedItem] = React.useState<TreeDataItem | null>(null)
+        
+        // 用于控制展开状态的state
+        const [expandedItemIds, setExpandedItemIds] = React.useState<string[]>(() => {
+            if (!initialSelectedItemId) {
+                return expandAll ? getAllNodeIds(data) : []
+            }
+
+            const ids: string[] = []
+
+            function walkTreeItems(
+                items: TreeDataItem[] | TreeDataItem,
+                targetId: string
+            ) {
+                if (items instanceof Array) {
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i]!.children) {
+                            ids.push(items[i]!.id)
+                        }
+                        if (walkTreeItems(items[i]!, targetId) && !expandAll) {
+                            return true
+                        }
+                        if (!expandAll && !items[i]!.children) ids.pop()
+                    }
+                } else if (!expandAll && items.id === targetId) {
+                    return true
+                } else if (items.children) {
+                    return walkTreeItems(items.children, targetId)
+                }
+            }
+
+            walkTreeItems(data, initialSelectedItemId)
+            return expandAll ? getAllNodeIds(data) : ids
+        })
+
+        // 获取所有节点ID的辅助函数
+        function getAllNodeIds(items: TreeDataItem[] | TreeDataItem): string[] {
+            const ids: string[] = []
+            const traverse = (nodes: TreeDataItem[] | TreeDataItem) => {
+                const nodeArray = Array.isArray(nodes) ? nodes : [nodes]
+                nodeArray.forEach(node => {
+                    if (node.children && node.children.length > 0) {
+                        ids.push(node.id)
+                        traverse(node.children)
+                    }
+                })
+            }
+            traverse(items)
+            return ids
+        }
+
+        // 找到节点路径的辅助函数
+        function findNodePath(items: TreeDataItem[] | TreeDataItem, targetName: string): string[] {
+            const path: string[] = []
+            
+            function traverse(nodes: TreeDataItem[] | TreeDataItem, currentPath: string[]): boolean {
+                const nodeArray = Array.isArray(nodes) ? nodes : [nodes]
+                
+                for (const node of nodeArray) {
+                    const newPath = [...currentPath, node.id]  // ✅ 始终包含当前节点
+                    
+                    // ✅ 支持多种匹配方式
+                    const isMatch = 
+                        node.name === targetName ||                           // 精确匹配
+                        node.name.endsWith(`-${targetName}`) ||               // 匹配 "索引-名称" 格式
+                        node.name.split('-')[1] === targetName ||             // 提取名称部分匹配
+                        node.id === targetName                                // ID 匹配
+                    
+                    if (isMatch) {
+                        path.push(...newPath)
+                        return true
+                    }
+                    
+                    if (node.children && traverse(node.children, newPath)) {
+                        return true
+                    }
+                }
+                return false
+            }
+            
+            traverse(items, [])
+            return path
+        }
+
+        // 找到目标节点的辅助函数
+        function findTargetNode(items: TreeDataItem[] | TreeDataItem, targetName: string): TreeDataItem | null {
+            function traverse(nodes: TreeDataItem[] | TreeDataItem): TreeDataItem | null {
+                const nodeArray = Array.isArray(nodes) ? nodes : [nodes]
+                
+                for (const node of nodeArray) {
+                    // 支持多种匹配方式
+                    const isMatch = 
+                        node.name === targetName ||                           // 精确匹配
+                        node.name.endsWith(`-${targetName}`) ||               // 匹配 "索引-名称" 格式
+                        node.name.split('-')[1] === targetName ||             // 提取名称部分匹配
+                        node.id === targetName                                // ID 匹配
+                    
+                    if (isMatch) {
+                        return node
+                    }
+                    
+                    if (node.children) {
+                        const found = traverse(node.children)
+                        if (found) return found
+                    }
+                }
+                return null
+            }
+            
+            return traverse(items)
+        }
+
+        // 暴露给ref的方法
+        React.useImperativeHandle(ref, () => ({
+            expandToNode: (nodeName: string) => {
+                const pathToNode = findNodePath(data, nodeName)
+                const targetNode = findTargetNode(data, nodeName)
+                
+                if (pathToNode.length > 0) {
+                    // 展开路径
+                    setExpandedItemIds(prev => {
+                        const newExpanded = new Set([...prev, ...pathToNode])
+                        return Array.from(newExpanded)
+                    })
+                    
+                    // 选中目标节点
+                    if (targetNode) {
+                        setSelectedItemId(targetNode.id)
+                        if (onSelectChange) {
+                            onSelectChange(targetNode)
+                        }
+                    }
+                }
+            },
+            expandAll: () => {
+                setExpandedItemIds(getAllNodeIds(data))
+            },
+            collapseAll: () => {
+                setExpandedItemIds([])
+            },
+            expandPath: (path: string[]) => {
+                setExpandedItemIds(prev => {
+                    const newExpanded = new Set([...prev, ...path])
+                    return Array.from(newExpanded)
+                })
+            },
+            getExpandedNodes: () => {
+                return expandedItemIds
+            }
+        }), [data, expandedItemIds])
 
         const handleSelectChange = React.useCallback(
             (item: TreeDataItem | undefined) => {
@@ -69,6 +229,15 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
                 }
             },
             [onSelectChange]
+        )
+
+        const handleHoverChange = React.useCallback(
+            (item: TreeDataItem | undefined) => {
+                if (onHoverChange) {
+                    onHoverChange(item)
+                }
+            },
+            [onHoverChange]
         )
 
         const handleDragStart = React.useCallback((item: TreeDataItem) => {
@@ -82,44 +251,15 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
             setDraggedItem(null)
         }, [draggedItem, onDocumentDrag])
 
-        const expandedItemIds = React.useMemo(() => {
-            if (!initialSelectedItemId) {
-                return [] as string[]
-            }
-
-            const ids: string[] = []
-
-            function walkTreeItems(
-                items: TreeDataItem[] | TreeDataItem,
-                targetId: string
-            ) {
-                if (items instanceof Array) {
-                    for (let i = 0; i < items.length; i++) {
-                        ids.push(items[i]!.id)
-                        if (walkTreeItems(items[i]!, targetId) && !expandAll) {
-                            return true
-                        }
-                        if (!expandAll) ids.pop()
-                    }
-                } else if (!expandAll && items.id === targetId) {
-                    return true
-                } else if (items.children) {
-                    return walkTreeItems(items.children, targetId)
-                }
-            }
-
-            walkTreeItems(data, initialSelectedItemId)
-            return ids
-        }, [data, expandAll, initialSelectedItemId])
-
         return (
-            <div className={cn('overflow-hidden relative p-2', className)}>
+            <div className={cn('overflow-auto relative p-2', className)}>
                 <TreeItem
                     data={data}
-                    ref={ref}
                     selectedItemId={selectedItemId}
                     handleSelectChange={handleSelectChange}
+                    handleHoverChange={handleHoverChange}
                     expandedItemIds={expandedItemIds}
+                    setExpandedItemIds={setExpandedItemIds}
                     defaultLeafIcon={defaultLeafIcon}
                     defaultNodeIcon={defaultNodeIcon}
                     handleDragStart={handleDragStart}
@@ -138,10 +278,12 @@ const TreeView = React.forwardRef<HTMLDivElement, TreeProps>(
 )
 TreeView.displayName = 'TreeView'
 
-type TreeItemProps = TreeProps & {
+type TreeItemProps = Omit<TreeProps, 'expandAll'> & {
     selectedItemId?: string
     handleSelectChange: (item: TreeDataItem | undefined) => void
+    handleHoverChange: (item: TreeDataItem | undefined) => void
     expandedItemIds: string[]
+    setExpandedItemIds: React.Dispatch<React.SetStateAction<string[]>>
     defaultNodeIcon?: any
     defaultLeafIcon?: any
     handleDragStart?: (item: TreeDataItem) => void
@@ -156,7 +298,9 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
             data,
             selectedItemId,
             handleSelectChange,
+            handleHoverChange,
             expandedItemIds,
+            setExpandedItemIds,
             defaultNodeIcon,
             defaultLeafIcon,
             handleDragStart,
@@ -179,7 +323,9 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                                     item={item}
                                     selectedItemId={selectedItemId}
                                     expandedItemIds={expandedItemIds}
+                                    setExpandedItemIds={setExpandedItemIds}
                                     handleSelectChange={handleSelectChange}
+                                    handleHoverChange={handleHoverChange}
                                     defaultNodeIcon={defaultNodeIcon}
                                     defaultLeafIcon={defaultLeafIcon}
                                     handleDragStart={handleDragStart}
@@ -191,6 +337,7 @@ const TreeItem = React.forwardRef<HTMLDivElement, TreeItemProps>(
                                     item={item}
                                     selectedItemId={selectedItemId}
                                     handleSelectChange={handleSelectChange}
+                                    handleHoverChange={handleHoverChange}
                                     defaultLeafIcon={defaultLeafIcon}
                                     handleDragStart={handleDragStart}
                                     handleDrop={handleDrop}
@@ -209,7 +356,9 @@ TreeItem.displayName = 'TreeItem'
 const TreeNode = ({
     item,
     handleSelectChange,
+    handleHoverChange,
     expandedItemIds,
+    setExpandedItemIds,
     selectedItemId,
     defaultNodeIcon,
     defaultLeafIcon,
@@ -219,7 +368,9 @@ const TreeNode = ({
 }: {
     item: TreeDataItem
     handleSelectChange: (item: TreeDataItem | undefined) => void
+    handleHoverChange: (item: TreeDataItem | undefined) => void
     expandedItemIds: string[]
+    setExpandedItemIds: React.Dispatch<React.SetStateAction<string[]>>
     selectedItemId?: string
     defaultNodeIcon?: any
     defaultLeafIcon?: any
@@ -227,10 +378,30 @@ const TreeNode = ({
     handleDrop?: (item: TreeDataItem) => void
     draggedItem: TreeDataItem | null
 }) => {
-    const [value, setValue] = React.useState(
-        expandedItemIds.includes(item.id) ? [item.id] : []
-    )
     const [isDragOver, setIsDragOver] = React.useState(false)
+    
+    const isExpanded = expandedItemIds.includes(item.id)
+    const value = isExpanded ? [item.id] : []
+
+    // 分离展开/收起逻辑
+    const handleToggleExpand = (e: React.MouseEvent) => {
+        e.stopPropagation() // 阻止冒泡
+        setExpandedItemIds(prev => {
+            const newExpanded = new Set(prev)
+            if (isExpanded) {
+                newExpanded.delete(item.id)
+            } else {
+                newExpanded.add(item.id)
+            }
+            return Array.from(newExpanded)
+        })
+    }
+
+    // 节点选中逻辑
+    const handleNodeSelect = () => {
+        handleSelectChange(item)
+        item.onClick?.()
+    }
 
     const onDragStart = (e: React.DragEvent) => {
         if (!item.draggable) {
@@ -262,49 +433,79 @@ const TreeNode = ({
         <AccordionPrimitive.Root
             type="multiple"
             value={value}
-            onValueChange={(s) => setValue(s)}
         >
             <AccordionPrimitive.Item value={item.id}>
-                <AccordionTrigger
+                {/* 修改为自定义的节点结构 */}
+                <div 
                     className={cn(
+                        'ml-2 flex flex-1 w-full items-center transition-all relative',
                         treeVariants(),
                         selectedItemId === item.id && selectedTreeVariants(),
                         isDragOver && dragOverVariants()
                     )}
-                    onClick={() => {
-                        handleSelectChange(item)
-                        item.onClick?.()
-                    }}
                     draggable={!!item.draggable}
                     onDragStart={onDragStart}
                     onDragOver={onDragOver}
                     onDragLeave={onDragLeave}
                     onDrop={onDrop}
                 >
-                    <TreeIcon
-                        item={item}
-                        isSelected={selectedItemId === item.id}
-                        isOpen={value.includes(item.id)}
-                        default={defaultNodeIcon}
-                    />
-                    <span className="text-sm truncate">{item.name}</span>
+                    {/* 箭头按钮 - 只负责展开/收起 */}
+                    <button
+                        onClick={handleToggleExpand}
+                        className="p-1 hover:bg-accent/50 rounded transition-colors flex items-center justify-center"
+                    >
+                        <ChevronRight 
+                            className={cn(
+                                "h-4 w-4 shrink-0 transition-transform duration-200 text-accent-foreground/50",
+                                isExpanded && "rotate-90"
+                            )} 
+                        />
+                    </button>
+                    
+                    {/* 节点内容 - 负责选中 */}
+                    <div 
+                        className="flex-1 flex items-center py-1 px-1 hover:bg-accent/30 rounded transition-colors cursor-pointer"
+                        onClick={handleNodeSelect}
+                        onMouseEnter={() => handleHoverChange?.(item)}
+                        onMouseLeave={() => handleHoverChange?.(undefined)}
+                    >
+                        <TreeIcon
+                            item={item}
+                            isSelected={selectedItemId === item.id}
+                            isOpen={isExpanded}
+                            default={defaultNodeIcon}
+                        />
+                        <span className="text-sm truncate">{item.name}</span>
+                    </div>
+                    
+                    {/* Actions */}
                     <TreeActions isSelected={selectedItemId === item.id}>
                         {item.actions}
                     </TreeActions>
-                </AccordionTrigger>
-                <AccordionContent className="pl-1 border-l">
-                    <TreeItem
-                        data={item.children ? item.children : item}
-                        selectedItemId={selectedItemId}
-                        handleSelectChange={handleSelectChange}
-                        expandedItemIds={expandedItemIds}
-                        defaultLeafIcon={defaultLeafIcon}
-                        defaultNodeIcon={defaultNodeIcon}
-                        handleDragStart={handleDragStart}
-                        handleDrop={handleDrop}
-                        draggedItem={draggedItem}
-                    />
-                </AccordionContent>
+                </div>
+                
+                <AccordionPrimitive.Content 
+                    className={cn(
+                        'overflow-hidden text-sm transition-all',
+                        'data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down'
+                    )}
+                >
+                    <div className="pl-1 border-l">
+                        <TreeItem
+                            data={item.children ? item.children : item}
+                            selectedItemId={selectedItemId}
+                            handleSelectChange={handleSelectChange}
+                            handleHoverChange={handleHoverChange}
+                            expandedItemIds={expandedItemIds}
+                            setExpandedItemIds={setExpandedItemIds}
+                            defaultLeafIcon={defaultLeafIcon}
+                            defaultNodeIcon={defaultNodeIcon}
+                            handleDragStart={handleDragStart}
+                            handleDrop={handleDrop}
+                            draggedItem={draggedItem}
+                        />
+                    </div>
+                </AccordionPrimitive.Content>
             </AccordionPrimitive.Item>
         </AccordionPrimitive.Root>
     )
@@ -316,6 +517,7 @@ const TreeLeaf = React.forwardRef<
         item: TreeDataItem
         selectedItemId?: string
         handleSelectChange: (item: TreeDataItem | undefined) => void
+        handleHoverChange: (item: TreeDataItem | undefined) => void
         defaultLeafIcon?: any
         handleDragStart?: (item: TreeDataItem) => void
         handleDrop?: (item: TreeDataItem) => void
@@ -328,6 +530,7 @@ const TreeLeaf = React.forwardRef<
             item,
             selectedItemId,
             handleSelectChange,
+            handleHoverChange,
             defaultLeafIcon,
             handleDragStart,
             handleDrop,
@@ -337,6 +540,13 @@ const TreeLeaf = React.forwardRef<
         ref
     ) => {
         const [isDragOver, setIsDragOver] = React.useState(false)
+
+        // 叶子节点选中逻辑
+        const handleLeafSelect = () => {
+            if (item.disabled) return
+            handleSelectChange(item)
+            item.onClick?.()
+        }
 
         const onDragStart = (e: React.DragEvent) => {
             if (!item.draggable || item.disabled) {
@@ -369,18 +579,16 @@ const TreeLeaf = React.forwardRef<
             <div
                 ref={ref}
                 className={cn(
-                    'ml-5 flex text-left items-center cursor-pointer before:right-1',
+                    'ml-5 flex text-left items-center cursor-pointer py-1 px-2 rounded transition-colors hover:bg-accent/30 relative',
                     treeVariants(),
                     className,
                     selectedItemId === item.id && selectedTreeVariants(),
                     isDragOver && dragOverVariants(),
                     item.disabled && 'opacity-50 cursor-not-allowed pointer-events-none'
                 )}
-                onClick={() => {
-                    if (item.disabled) return
-                    handleSelectChange(item)
-                    item.onClick?.()
-                }}
+                onClick={handleLeafSelect} // 直接绑定选中事件
+                onMouseEnter={() => handleHoverChange?.(item)}
+                onMouseLeave={() => handleHoverChange?.(undefined)}
                 draggable={!!item.draggable && !item.disabled}
                 onDragStart={onDragStart}
                 onDragOver={onDragOver}
@@ -402,43 +610,6 @@ const TreeLeaf = React.forwardRef<
     }
 )
 TreeLeaf.displayName = 'TreeLeaf'
-
-const AccordionTrigger = React.forwardRef<
-    React.ElementRef<typeof AccordionPrimitive.Trigger>,
-    React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Trigger>
->(({ className, children, ...props }, ref) => (
-    <AccordionPrimitive.Header>
-        <AccordionPrimitive.Trigger
-            ref={ref}
-            className={cn(
-                'ml-2 flex flex-1 w-full items-center transition-all first:[&[data-state=open]>svg]:rotate-90',
-                className
-            )}
-            {...props}
-        >
-            <ChevronRight className="h-4 w-4 shrink-0 transition-transform duration-200 text-accent-foreground/50 mr-1" />
-            {children}
-        </AccordionPrimitive.Trigger>
-    </AccordionPrimitive.Header>
-))
-AccordionTrigger.displayName = AccordionPrimitive.Trigger.displayName
-
-const AccordionContent = React.forwardRef<
-    React.ElementRef<typeof AccordionPrimitive.Content>,
-    React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-    <AccordionPrimitive.Content
-        ref={ref}
-        className={cn(
-            'overflow-hidden text-sm',
-            className
-        )}
-        {...props}
-    >
-        <div className="pb-1 pt-0">{children}</div>
-    </AccordionPrimitive.Content>
-))
-AccordionContent.displayName = AccordionPrimitive.Content.displayName
 
 const TreeIcon = ({
     item,

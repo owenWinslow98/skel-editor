@@ -1,8 +1,10 @@
-import { Spine } from "@/renderer/lib/spine/spine-pixi/src"
+import { Spine, SpineDebugRenderer } from "@/renderer/lib/spine/spine-pixi/src"
 import type { TextureAtlas, SkeletonData } from "../../lib/spine/spine-core/src"
-import { setCurrentSpineData } from "../../store/canvasSlice"
+import { setCurrentBone, setCurrentSpineData } from "../../store/canvasSlice"
 import { store } from "@/renderer/store"
-
+import { getGlobalTreeViewRef } from "@/renderer/store/globalContext"
+// 导出全局 debugRenderer 实例
+export let currentDebugRenderer: SpineDebugRenderer | null = null
 
 export function initSkeletonStore(spineInstance: Spine) {
     currentSpineInstanceData.skel = spineInstance.skeleton.data
@@ -97,10 +99,40 @@ function extractByBounds(
 
     return regionCanvas
 }
+
+export async function createDebuger() {
+
+    const debugRenderer = await SpineDebugRenderer.createInstance();
+
+    // 可以配置调试选项
+    debugRenderer.drawBones = true;
+    debugRenderer.drawBoundingBoxes = false;
+    debugRenderer.drawRegionAttachments = false;
+    debugRenderer.drawPaths = false;
+    debugRenderer.drawMeshTriangles = false;
+    debugRenderer.drawMeshHull = false;
+    debugRenderer.drawClipping = false;
+    debugRenderer.drawEvents = false;
+    debugRenderer.setOperationPanelTheme(store.getState().global.isBlackUISkin ? 'dark' : 'light')
+    debugRenderer.onBoneSelect = (boneName: string) => {
+        const treeViewRef = getGlobalTreeViewRef()
+        const handleExpandToNode = () => {
+            treeViewRef.current?.expandToNode(boneName)
+        }
+        handleExpandToNode()
+        store.dispatch(setCurrentBone(boneName))
+    }
+    
+    // 设置全局引用
+    currentDebugRenderer = debugRenderer
+    
+    return debugRenderer
+}
+
 export const currentSpineInstanceData: {
     atlas: TextureAtlas | null,
     skel: SkeletonData | null,
-    spineInstance: Spine | null
+    spineInstance: Spine | null,
 } = {
     atlas: null,
     skel: null,

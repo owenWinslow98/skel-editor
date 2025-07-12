@@ -15,8 +15,8 @@ import { setSpineAssets, SpineAssets, toggleBlackUISkin } from '../store/globalS
 import { useAppDispatch, useAppSelector } from '../hooks/redux';
 import { Eclipse, House } from 'lucide-react';
 import { isEmpty, isNull, isUndefined } from 'lodash';
-
-
+import { currentSpineInstanceData } from '../layout/Scen/SpineUtil'
+import { SpineDebugRenderer } from '../lib/spine/spine-pixi/src/SpineDebugRenderer'
 
 interface skin {
     name: string;
@@ -25,7 +25,7 @@ interface skin {
 }
 const Menu: React.FC<{ className?: string }> = ({ className }) => {
     const dispatch = useAppDispatch();
-    const { currentSpineAssets } = useAppSelector(state => state.global);
+    const { currentSpineAssets, isBlackUISkin } = useAppSelector(state => state.global);
 
     const menuFileName = useMemo(() => {
         if (isNull(currentSpineAssets)) return 'Skel Editor'
@@ -50,7 +50,7 @@ const Menu: React.FC<{ className?: string }> = ({ className }) => {
         const { ipc } = window.electronAPI;
         try {
             const fileData = await ipc.callMain('open-file') as any;
-            if(isUndefined(fileData)) return
+            if (isUndefined(fileData)) return
             const { skel, json, atlas, skins, skelVersion } = fileData
             const transformSkel = isNull(skel.file) ? null : URL.createObjectURL(new Blob([skel.file], { type: 'application/octet-stream' }))
             const transformJson = isNull(json.file) ? null : URL.createObjectURL(new Blob([json.file], { type: 'application/json' }))
@@ -91,6 +91,14 @@ const Menu: React.FC<{ className?: string }> = ({ className }) => {
 
     const resetHome = () => {
         dispatch(setSpineAssets(null))
+    }
+
+    const toggleTheme = () => {
+        dispatch(toggleBlackUISkin())
+        const { spineInstance } = currentSpineInstanceData
+        if (isNull(spineInstance)) return
+        if (isNull(spineInstance.debug)) return
+        (spineInstance.debug as SpineDebugRenderer).setOperationPanelTheme(isBlackUISkin ? 'light' : 'dark')
     }
     useEffect(() => {
         // 监听窗口状态变化
@@ -147,7 +155,7 @@ const Menu: React.FC<{ className?: string }> = ({ className }) => {
                 {menuFileName}
             </div>
             {/* UI skin*/}
-            <div title="transfer skin" className='relative flex items-center justify-center h-full pr-4 cursor-pointer no-drag group' onClick={() => dispatch(toggleBlackUISkin())}>
+            <div title="transfer skin" className='relative flex items-center justify-center h-full pr-4 cursor-pointer no-drag group' onClick={toggleTheme}>
                 <Eclipse size={24} strokeWidth={1} absoluteStrokeWidth />
             </div>
             {/* 右侧窗口控制按钮 */}

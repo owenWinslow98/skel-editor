@@ -54,7 +54,8 @@ interface CanvasState {
   bonesTreeData: TreeDataItem
   currentSpineData: {
     atlas: pageAtlas[],
-    skel: skeletonStore | null
+    skel: skeletonStore | null,
+    bone: string | null
   },
   currentAnimation: string | null
 }
@@ -96,7 +97,8 @@ const initialState: CanvasState = {
   bonesTreeData: { id: '0', name: 'root', children: null },
   currentSpineData: {
     atlas: null,
-    skel: null
+    skel: null,
+    bone: null
   },
   currentAnimation: null
 };
@@ -197,8 +199,15 @@ const canvasSlice = createSlice({
     setBonesTreeData: (state, action: PayloadAction<TreeDataItem>) => {
       state.bonesTreeData = action.payload;
     },
-    setCurrentSpineData: (state, action: PayloadAction<{ atlas: pageAtlas[], skel: skeletonStore | null }>) => {
+    setCurrentSpineData: (state, action: PayloadAction<{ atlas: pageAtlas[], skel: skeletonStore | null, bone: string | null }>) => {
       state.currentSpineData = action.payload;
+    },
+    setCurrentBone: (state, action: PayloadAction<string | null>) => {
+      console.log(action.payload)
+      state.currentSpineData = {
+        ...state.currentSpineData,
+        bone: action.payload
+      }
     },
     setCurrentAnimation: (state, action: PayloadAction<string | null>) => {
       console.log(action.payload)
@@ -230,7 +239,8 @@ export const {
   setBonesData,
   setBonesTreeData,
   setCurrentSpineData,
-  setCurrentAnimation
+  setCurrentAnimation,
+  setCurrentBone
 } = canvasSlice.actions;
 
 // 导出 reducer

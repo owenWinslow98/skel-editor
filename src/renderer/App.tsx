@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import Menu from './components/Menu';
-import Scene from './components/Scen/Scen';
+import Scene from './layout/Scen/Scen';
 import ResourcePanel from './layout/ResourcePanel';
 import TimePanel from './layout/TimePanel';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from './ui/resizable';
@@ -24,7 +24,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (canvasLeftSideRef.current) {
-      console.log(canvasLeftSideRef.current.getLayout())
       const layout = isNull(currentAnimation) ? [100, 0] : [65, 35]
       canvasLeftSideRef.current.setLayout(layout)
     }
